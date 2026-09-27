@@ -1,0 +1,12 @@
+docs/
+dist/
+AGENTS.md
+MEMORY.md
+idea.md
+learning_skill/
+
+server/node_modules/
+plugins/bilibili-audio/runtime/
+plugins/bilibili-audio/vendor/
+plugins/bilibili-audio/server/index.mjs
+*.log
