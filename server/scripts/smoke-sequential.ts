@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { PlaybackController } from '../src/controller.js';
 import { MpvPlayer } from '../src/player.js';
@@ -26,9 +27,9 @@ function silentWav(seconds: number): Buffer {
   return wav;
 }
 
-const dist = resolve('..', 'dist');
-const temp = await mkdtemp(join(dist, 'smoke-sequential-'));
-if (dirname(temp) !== dist) throw new Error('临时目录路径越界');
+const temporaryRoot = resolve(tmpdir());
+const temp = await mkdtemp(join(temporaryRoot, 'bmp-smoke-sequential-'));
+if (dirname(temp) !== temporaryRoot) throw new Error('临时目录路径越界');
 const player = new MpvPlayer(resolve('..', 'plugins', 'bilibili-audio', 'vendor', 'mpv', 'mpv.exe'),
   resolve('..', 'plugins', 'bilibili-audio', 'vendor', 'yt-dlp', 'yt-dlp.exe'));
 try {
@@ -59,5 +60,5 @@ try {
   assert.equal(state.history_length, 2, '自动切歌应添加播放历史');
 } finally {
   player.close();
-  if (dirname(temp) === dist) await rm(temp, { recursive: true, force: true });
+  if (dirname(temp) === temporaryRoot) await rm(temp, { recursive: true, force: true });
 }

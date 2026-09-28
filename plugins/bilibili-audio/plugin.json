@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "bilibili-audio",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "在 Codex 中搜索 B 站视频并在本机播放音频。",
   "keywords": ["bilibili", "audio", "music"],
   "extensions": {

@@ -1,11 +1,11 @@
-import { mkdir, stat, writeFile } from 'node:fs/promises';
+import { stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 
 const plugin = process.env.BMP_PLUGIN_ROOT ?? resolve('..', 'plugins', 'bilibili-audio');
 const query = process.argv[2] ?? '琵琶曲DJ';
-const client = new Client({ name: 'bmp-cover-smoke', version: '0.2.0' });
+const client = new Client({ name: 'bmp-cover-smoke', version: '0.3.0' });
 
 try {
   await client.connect(new StdioClientTransport({
@@ -36,10 +36,7 @@ try {
     process.stdout.write(`${candidate.bvid}: ${candidate.title} | ${candidate.uploader} | ${candidate.duration_seconds ?? '未知'} 秒 | ${candidate.published_date ?? '日期未知'} | ${size} bytes\n`);
   }
   if (cached === 0) throw new Error('没有候选封面成功写入本机缓存');
-  const preview = resolve('..', 'dist', 'candidate-preview.md');
-  await mkdir(resolve('..', 'dist'), { recursive: true });
-  await writeFile(preview, found.display_markdown, 'utf8');
-  process.stdout.write(`候选预览：${preview}\n`);
+  process.stdout.write(`已验证 ${found.candidates.length} 条候选和 ${cached} 张本机封面。\n`);
 } finally {
   await client.close();
 }

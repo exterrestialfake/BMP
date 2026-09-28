@@ -42,7 +42,7 @@ function result<T>(operation: () => Promise<T>) {
 }
 
 function createServer(): McpServer {
-  const server = new McpServer({ name: 'bilibili-audio', version: '0.2.0' });
+  const server = new McpServer({ name: 'bilibili-audio', version: '0.3.0' });
   server.server.onclose = () => controller.close();
   server.registerTool('search', {
     description: '按关键词搜索 B 站视频并替换旧候选。直接向用户展示返回的 display_markdown，其中含标题、UP 主、时长、发布日期、BV 号、链接和本机封面；等待用户选择后再播放。',
