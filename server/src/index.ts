@@ -10,22 +10,25 @@ import { MpvPlayer } from './player.js';
 import { BilibiliSearch } from './search.js';
 import { cacheCover } from './cover.js';
 import { formatCandidateList } from './candidate-list.js';
+import { PanelSupervisor } from './panel.js';
 import { defaultControlPipe, SharedPlaybackController } from './shared.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ytDlp = resolve(root, 'vendor', 'yt-dlp', 'yt-dlp.exe');
 const mpv = resolve(root, 'vendor', 'mpv', 'mpv.exe');
 const controlPipe = defaultControlPipe();
+const panelSupervisor = new PanelSupervisor(() => {
+  const script = resolve(root, 'panel', 'panel.ps1');
+  return spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-File', script,
+    '-PipeName', controlPipe.slice('\\\\.\\pipe\\'.length)], {
+    shell: false, windowsHide: true, detached: true, stdio: 'ignore'
+  });
+}, 3000, (error) => process.stderr.write(`悬浮面板启动失败：${error.message}\n`));
 function launchPanel(): void {
   if (process.platform !== 'win32' || process.env.BMP_DISABLE_PANEL === '1') return;
   const script = resolve(root, 'panel', 'panel.ps1');
   if (!existsSync(script)) return;
-  const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-File', script,
-    '-PipeName', controlPipe.slice('\\\\.\\pipe\\'.length)], {
-    shell: false, windowsHide: true, detached: true, stdio: 'ignore'
-  });
-  child.on('error', (error) => process.stderr.write(`悬浮面板启动失败：${error.message}\n`));
-  child.unref();
+  panelSupervisor.start();
 }
 const controller = new SharedPlaybackController(new PlaybackController(new BilibiliSearch(ytDlp), new MpvPlayer(mpv, ytDlp)), controlPipe, launchPanel);
 
@@ -42,8 +45,8 @@ function result<T>(operation: () => Promise<T>) {
 }
 
 function createServer(): McpServer {
-  const server = new McpServer({ name: 'bilibili-audio', version: '0.3.0' });
-  server.server.onclose = () => controller.close();
+  const server = new McpServer({ name: 'bilibili-audio', version: '0.3.1' });
+  server.server.onclose = () => { panelSupervisor.stop(); controller.close(); };
   server.registerTool('search', {
     description: '按关键词搜索 B 站视频并替换旧候选。直接向用户展示返回的 display_markdown，其中含标题、UP 主、时长、发布日期、BV 号、链接和本机封面；等待用户选择后再播放。',
     inputSchema: z.object({ query: z.string().min(1).max(120), limit: z.number().int().min(1).max(10).default(5) })
@@ -99,8 +102,8 @@ function createServer(): McpServer {
 if (!existsSync(ytDlp) || !existsSync(mpv)) {
   process.stderr.write(`Bilibili Audio: 请将 yt-dlp.exe 与 mpv.exe 放入插件 vendor 目录。yt-dlp=${ytDlp}; mpv=${mpv}\n`);
 }
-process.once('exit', () => controller.close());
-process.once('SIGINT', () => { controller.close(); process.exit(0); });
-process.once('SIGTERM', () => { controller.close(); process.exit(0); });
+process.once('exit', () => { panelSupervisor.stop(); controller.close(); });
+process.once('SIGINT', () => { panelSupervisor.stop(); controller.close(); process.exit(0); });
+process.once('SIGTERM', () => { panelSupervisor.stop(); controller.close(); process.exit(0); });
 serveStdio(() => createServer());
 void controller.status().catch((error) => process.stderr.write(`本地控制启动失败：${String(error)}\n`));

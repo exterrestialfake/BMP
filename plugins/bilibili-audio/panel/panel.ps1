@@ -1,5 +1,7 @@
 ﻿param([Parameter(Mandatory=$true)][string]$PipeName)
 
+$ErrorActionPreference = 'Stop'
+
 Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName PresentationCore
 Add-Type -TypeDefinition @'
@@ -27,7 +29,7 @@ public static class PanelPipe {
 
 $created = $false
 $mutex = [System.Threading.Mutex]::new($true, "Local\BMP-Panel-$PipeName", [ref]$created)
-if (-not $created) { $mutex.Dispose(); exit 0 }
+if (-not $created) { $mutex.Dispose(); exit 10 }
 
 function Find-CodexWindow {
     $main = Get-CimInstance Win32_Process -Filter "Name='ChatGPT.exe'" -ErrorAction SilentlyContinue |
@@ -42,7 +44,7 @@ function Find-CodexWindow {
 }
 
 $codex = Find-CodexWindow
-if ($null -eq $codex) { $mutex.ReleaseMutex(); $mutex.Dispose(); exit 0 }
+if ($null -eq $codex) { $mutex.ReleaseMutex(); $mutex.Dispose(); exit 11 }
 $codexPid = $codex.Id
 
 function Invoke-Control([string]$Method, [object[]]$Parameters = @()) {

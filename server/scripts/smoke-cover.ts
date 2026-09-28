@@ -5,7 +5,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 
 const plugin = process.env.BMP_PLUGIN_ROOT ?? resolve('..', 'plugins', 'bilibili-audio');
 const query = process.argv[2] ?? '琵琶曲DJ';
-const client = new Client({ name: 'bmp-cover-smoke', version: '0.3.0' });
+const client = new Client({ name: 'bmp-cover-smoke', version: '0.3.1' });
 
 try {
   await client.connect(new StdioClientTransport({
