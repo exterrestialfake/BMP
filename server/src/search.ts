@@ -68,13 +68,15 @@ export class BilibiliSearch {
           signal: AbortSignal.timeout(5000)
         });
         if (!response.ok) return null;
-        const body = await response.json() as { code?: number; data?: { bvid?: string; title?: string; owner?: { name?: string }; duration?: number } };
+        const body = await response.json() as { code?: number; data?: { bvid?: string; title?: string; owner?: { name?: string }; duration?: number; pubdate?: number; pic?: string } };
         if (body.code !== 0 || !body.data) return null;
         return candidateFromYtDlp({
           id: body.data.bvid,
           title: body.data.title,
           uploader: body.data.owner?.name,
-          duration: body.data.duration
+          duration: body.data.duration,
+          pubdate: body.data.pubdate,
+          pic: body.data.pic
         }, 0);
       } catch {
         // A deleted or restricted video must not invalidate the other candidates.
@@ -130,7 +132,7 @@ export class BilibiliSearch {
       const title = typeof raw.title === 'string'
         ? raw.title.replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
         : raw.title;
-      const candidate = candidateFromYtDlp({ id: raw.bvid, title, uploader: raw.author, duration }, candidates.length + 1);
+      const candidate = candidateFromYtDlp({ id: raw.bvid, title, uploader: raw.author, duration, pubdate: raw.pubdate, pic: raw.pic }, candidates.length + 1);
       if (!candidate || seen.has(candidate.bvid)) continue;
       seen.add(candidate.bvid);
       candidates.push(candidate);

@@ -17,8 +17,10 @@ export interface PlayerPort {
   load(url: string): Promise<PlaybackSnapshot>;
   setPaused(paused: boolean): Promise<PlaybackSnapshot>;
   setVolume(volume: number): Promise<PlaybackSnapshot>;
+  setLoop?(enabled: boolean): Promise<void>;
   stop(): Promise<PlaybackSnapshot>;
   status(): Promise<PlaybackSnapshot>;
+  onEnded?(listener: () => void): void;
   close(): void;
 }
 
@@ -29,6 +31,7 @@ export class MpvPlayer implements PlayerPort {
   private nextId = 1;
   private readonly pending = new Map<number, { resolve: (data: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }>();
   private readonly events = new Set<(event: MpvEvent) => void>();
+  private readonly endedListeners = new Set<() => void>();
   private state: PlaybackSnapshot['state'] = 'idle';
   private recentError: string | null = null;
   private starting?: Promise<void>;
@@ -120,6 +123,9 @@ export class MpvPlayer implements PlayerPort {
           if (event.reason === 'error') this.recentError = `播放失败：${event.error ?? '未知错误'}`;
         }
         for (const listener of this.events) listener(event);
+        if (event.event === 'end-file' && event.reason === 'eof') {
+          for (const listener of this.endedListeners) listener();
+        }
       }
     }
   }
@@ -183,16 +189,22 @@ export class MpvPlayer implements PlayerPort {
 
   async setPaused(paused: boolean): Promise<PlaybackSnapshot> {
     if (!this.process) throw new Error('当前没有正在运行的播放器');
-    if (this.state !== 'playing' && this.state !== 'paused') throw new Error('当前视频未在播放；请重新选取视频或播放下一候选');
+    if (this.state !== 'playing' && this.state !== 'paused') throw new Error('当前视频未在播放；请重新点播或选择播放历史中的其他视频');
     await this.command(['set_property', 'pause', paused]);
     this.state = paused ? 'paused' : 'playing';
     return this.status();
   }
 
+  onEnded(listener: () => void): void { this.endedListeners.add(listener); }
+
   async setVolume(volume: number): Promise<PlaybackSnapshot> {
     if (!this.process) throw new Error('当前没有正在运行的播放器');
     await this.command(['set_property', 'volume', volume]);
     return this.status();
+  }
+
+  async setLoop(enabled: boolean): Promise<void> {
+    await this.command(['set_property', 'loop-file', enabled ? 'inf' : 'no']);
   }
 
   async stop(): Promise<PlaybackSnapshot> {
@@ -228,5 +240,6 @@ export class MpvPlayer implements PlayerPort {
     this.process?.kill();
     this.socket = undefined;
     this.process = undefined;
+    this.state = 'idle';
   }
 }

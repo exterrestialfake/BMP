@@ -10,7 +10,7 @@ import type { Candidate } from '../src/video.js';
 
 const candidates: Candidate[] = [1, 2].map((n) => ({
   candidate_id: String(n), bvid: `BV1vx411w7H${n}`, title: `候选 ${n}`,
-  uploader: 'UP 主', duration_seconds: 100, url: `https://www.bilibili.com/video/BV1vx411w7H${n}`
+  uploader: 'UP 主', duration_seconds: 100, published_date: null, cover_url: null, url: `https://www.bilibili.com/video/BV1vx411w7H${n}`
 }));
 
 class FakePlayer implements PlayerPort {
@@ -38,9 +38,11 @@ test('不同 MCP 实例共享候选、播放状态和停止命令', async () => 
     assert.deepEqual(otherPlayer.loaded, []);
     assert.equal((await other.setPaused(true)).state, 'paused');
     assert.equal((await owner.status()).state, 'paused');
+    await other.playSelection(search.search_id, '2');
+    assert.equal((await other.previous()).current?.candidate_id, '1');
     assert.equal((await other.next()).current?.candidate_id, '2');
-    assert.equal((await owner.stop()).state, 'idle');
-    assert.equal((await other.status()).state, 'idle');
+    assert.equal((await owner.stop()).state, 'paused');
+    assert.equal((await other.status()).state, 'paused');
   } finally {
     other.close();
     owner.close();
@@ -69,8 +71,9 @@ test('独立进程中的新会话可控制主实例', async () => {
     assert.equal(search.candidates.length, 2);
     await other.playSelection(search.search_id, '1');
     assert.equal((await other.setPaused(true)).state, 'paused');
-    assert.equal((await other.next()).current?.candidate_id, '2');
-    assert.equal((await other.stop()).state, 'idle');
+    await other.playSelection(search.search_id, '2');
+    assert.equal((await other.previous()).current?.candidate_id, '1');
+    assert.equal((await other.stop()).state, 'paused');
     assert.deepEqual(localPlayer.loaded, []);
   } finally {
     other.close();

@@ -1,6 +1,6 @@
 {
   "name": "bilibili-audio-server",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,9 @@
     "check": "tsc --noEmit",
     "test": "node --import tsx --test test/*.test.ts",
     "smoke:playback": "node --import tsx scripts/smoke-playback.ts",
-    "smoke:search": "node --import tsx scripts/smoke-search.ts"
+    "smoke:search": "node --import tsx scripts/smoke-search.ts",
+    "smoke:sequential": "node --import tsx scripts/smoke-sequential.ts",
+    "smoke:cover": "node --import tsx scripts/smoke-cover.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.1.0",

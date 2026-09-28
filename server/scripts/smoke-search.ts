@@ -19,11 +19,15 @@ try {
   }));
   const found = await call('search', { query, limit: 2 });
   process.stdout.write(`search: ${found.candidates.map((x: any) => `${x.candidate_id}. ${x.title} (${x.bvid})`).join(' | ')}\n`);
-  if (found.candidates.length < 2) throw new Error('候选不足两条，无法验证 next');
+  if (found.candidates.length < 2) throw new Error('候选不足两条，无法验证播放历史');
   const first = await call('play', { search_id: found.search_id, candidate_id: found.candidates[0].candidate_id });
   process.stdout.write(`play: ${first.state} ${first.current.bvid}\n`);
-  const second = await call('next', {});
-  process.stdout.write(`next: ${second.state} ${second.current.bvid}\n`);
+  const second = await call('play', { search_id: found.search_id, candidate_id: found.candidates[1].candidate_id });
+  process.stdout.write(`play: ${second.state} ${second.current.bvid}\n`);
+  const previous = await call('previous', {});
+  process.stdout.write(`previous: ${previous.state} ${previous.current.bvid}\n`);
+  const next = await call('next', {});
+  process.stdout.write(`next: ${next.state} ${next.current.bvid}\n`);
   await call('set_paused', { paused: true });
 } finally {
   await client.close();

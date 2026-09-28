@@ -5,7 +5,7 @@ import type { Candidate } from '../../src/video.js';
 
 const candidates: Candidate[] = [1, 2].map((n) => ({
   candidate_id: String(n), bvid: `BV1vx411w7H${n}`, title: `候选 ${n}`,
-  uploader: 'UP 主', duration_seconds: 100, url: `https://www.bilibili.com/video/BV1vx411w7H${n}`
+  uploader: 'UP 主', duration_seconds: 100, published_date: null, cover_url: null, url: `https://www.bilibili.com/video/BV1vx411w7H${n}`
 }));
 
 class FakePlayer implements PlayerPort {

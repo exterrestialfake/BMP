@@ -3,7 +3,7 @@ import { createServer, connect, type Server, type Socket } from 'node:net';
 import { homedir } from 'node:os';
 import type { PlaybackController } from './controller.js';
 
-type Method = 'search' | 'playSelection' | 'playDirect' | 'next' | 'setPaused' | 'setVolume' | 'status' | 'stop';
+type Method = 'search' | 'playSelection' | 'playDirect' | 'next' | 'previous' | 'setMode' | 'setPaused' | 'setVolume' | 'status' | 'stop' | 'shutdown';
 type Request = { method: Method; args: unknown[] };
 type Reply = { ok: true; data: unknown } | { ok: false; error: string };
 
@@ -18,7 +18,7 @@ export class SharedPlaybackController {
   private role?: Promise<'owner' | 'client'>;
   private closed = false;
 
-  constructor(private readonly local: PlaybackController, private readonly pipe = defaultControlPipe()) {}
+  constructor(private readonly local: PlaybackController, private readonly pipe = defaultControlPipe(), private readonly onOwner?: () => void) {}
 
   private async elect(): Promise<'owner' | 'client'> {
     const server = createServer((socket) => this.handle(socket));
@@ -33,6 +33,7 @@ export class SharedPlaybackController {
       if (this.closed) { server.close(); throw new Error('控制服务已关闭'); }
       this.server = server;
       server.on('error', () => { this.server = undefined; this.role = undefined; });
+      this.onOwner?.();
       return 'owner';
     } catch (error) {
       server.close();
@@ -47,10 +48,13 @@ export class SharedPlaybackController {
       case 'playSelection': return this.local.playSelection(args[0] as string, args[1] as string);
       case 'playDirect': return this.local.playDirect(args[0] as string);
       case 'next': return this.local.next();
+      case 'previous': return this.local.previous();
+      case 'setMode': return this.local.setMode(args[0] as 'off' | 'single' | 'sequential');
       case 'setPaused': return this.local.setPaused(args[0] as boolean);
       case 'setVolume': return this.local.setVolume(args[0] as number);
       case 'status': return this.local.status();
       case 'stop': return this.local.stop();
+      case 'shutdown': this.local.close(); return { closed: true };
       default: throw new Error('未知控制命令');
     }
   }
@@ -124,6 +128,8 @@ export class SharedPlaybackController {
   playSelection(searchId: string, candidateId: string) { return this.call<Awaited<ReturnType<PlaybackController['playSelection']>>>('playSelection', searchId, candidateId); }
   playDirect(video: string) { return this.call<Awaited<ReturnType<PlaybackController['playDirect']>>>('playDirect', video); }
   next() { return this.call<Awaited<ReturnType<PlaybackController['next']>>>('next'); }
+  previous() { return this.call<Awaited<ReturnType<PlaybackController['previous']>>>('previous'); }
+  setMode(mode: 'off' | 'single' | 'sequential') { return this.call<Awaited<ReturnType<PlaybackController['setMode']>>>('setMode', mode); }
   setPaused(paused: boolean) { return this.call<Awaited<ReturnType<PlaybackController['setPaused']>>>('setPaused', paused); }
   setVolume(volume: number) { return this.call<Awaited<ReturnType<PlaybackController['setVolume']>>>('setVolume', volume); }
   status() { return this.call<Awaited<ReturnType<PlaybackController['status']>>>('status'); }
