@@ -1,5 +1,4 @@
 import { existsSync } from 'node:fs';
-import { spawn } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/server';
@@ -10,7 +9,7 @@ import { MpvPlayer } from './player.js';
 import { BilibiliSearch } from './search.js';
 import { cacheCover } from './cover.js';
 import { presentSearchResults } from './candidate-list.js';
-import { PanelSupervisor } from './panel.js';
+import { PanelSupervisor, spawnPanelProcess } from './panel.js';
 import { defaultControlPipe, SharedPlaybackController } from './shared.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -19,10 +18,7 @@ const mpv = resolve(root, 'vendor', 'mpv', 'mpv.exe');
 const controlPipe = defaultControlPipe();
 const panelSupervisor = new PanelSupervisor(() => {
   const script = resolve(root, 'panel', 'panel.ps1');
-  return spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-File', script,
-    '-PipeName', controlPipe.slice('\\\\.\\pipe\\'.length)], {
-    shell: false, windowsHide: true, detached: true, stdio: 'ignore'
-  });
+  return spawnPanelProcess(script, controlPipe.slice('\\\\.\\pipe\\'.length));
 }, 3000, (error) => process.stderr.write(`悬浮面板启动失败：${error.message}\n`));
 function launchPanel(): void {
   if (process.platform !== 'win32' || process.env.BMP_DISABLE_PANEL === '1') return;

@@ -1,4 +1,12 @@
-import type { ChildProcess } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
+
+/** 启动 Windows 悬浮面板。 */
+export function spawnPanelProcess(script: string, pipeName: string, hostProcessId = process.ppid): ChildProcess {
+  return spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-File', script,
+    '-PipeName', pipeName, '-HostProcessId', String(hostProcessId)], {
+    shell: false, windowsHide: true, stdio: 'ignore'
+  });
+}
 
 /** 只有主 MCP 实例负责维持一个桌面面板；短暂启动失败后会重试。 */
 export class PanelSupervisor {
@@ -23,12 +31,12 @@ export class PanelSupervisor {
     this.retryTimer = null;
   }
 
-  private retry(): void {
+  private retry(delayMs = this.retryMs): void {
     if (!this.active || this.retryTimer) return;
     this.retryTimer = setTimeout(() => {
       this.retryTimer = null;
       this.launch();
-    }, this.retryMs);
+    }, delayMs);
     this.retryTimer.unref();
   }
 
@@ -44,16 +52,17 @@ export class PanelSupervisor {
     }
 
     let finished = false;
-    const finish = (restart: boolean): void => {
+    const finish = (delayMs = this.retryMs): void => {
       if (finished) return;
       finished = true;
-      if (restart) this.retry();
+      this.retry(delayMs);
     };
     child.once('error', (error) => {
       this.reportError(error);
-      finish(true);
+      finish();
     });
-    child.once('exit', (code, signal) => finish(code !== 0 || signal !== null));
+    // 主 MCP 仍运行时继续监督；互斥锁占用或宿主已退出时放慢重试。
+    child.once('exit', (code) => finish(code === 10 || code === 11 ? this.retryMs * 5 : this.retryMs));
     child.unref();
   }
 }

@@ -1,4 +1,7 @@
-﻿param([Parameter(Mandatory=$true)][string]$PipeName)
+﻿param(
+    [Parameter(Mandatory=$true)][string]$PipeName,
+    [Parameter(Mandatory=$true)][int]$HostProcessId
+)
 
 $ErrorActionPreference = 'Stop'
 
@@ -31,21 +34,9 @@ $created = $false
 $mutex = [System.Threading.Mutex]::new($true, "Local\BMP-Panel-$PipeName", [ref]$created)
 if (-not $created) { $mutex.Dispose(); exit 10 }
 
-function Find-CodexWindow {
-    $main = Get-CimInstance Win32_Process -Filter "Name='ChatGPT.exe'" -ErrorAction SilentlyContinue |
-        Where-Object { $_.ExecutablePath -match 'OpenAI[.\\]Codex' -and $_.CommandLine -notmatch '--type=' } |
-        Select-Object -First 1
-    if ($null -eq $main) { return $null }
-    $process = Get-Process -Id $main.ProcessId -ErrorAction SilentlyContinue
-    if ($null -eq $process) { return $null }
-    $process.Refresh()
-    if ($process.MainWindowHandle -eq [IntPtr]::Zero) { return $null }
-    return $process
-}
-
-$codex = Find-CodexWindow
-if ($null -eq $codex) { $mutex.ReleaseMutex(); $mutex.Dispose(); exit 11 }
-$codexPid = $codex.Id
+# HostProcessId 是主 MCP 的父进程，即启动它的 Codex 后台；关闭 GUI 不影响面板。
+$hostProcess = Get-Process -Id $HostProcessId -ErrorAction SilentlyContinue
+if ($null -eq $hostProcess) { $mutex.ReleaseMutex(); $mutex.Dispose(); exit 11 }
 
 function Invoke-Control([string]$Method, [object[]]$Parameters = @()) {
     $pipe = [System.IO.Pipes.NamedPipeClientStream]::new('.', $PipeName, [System.IO.Pipes.PipeDirection]::InOut)
@@ -264,15 +255,14 @@ $pause.Add_Click({
 $previous.Add_Click({ Run-Action 'previous' })
 $next.Add_Click({ Run-Action 'next' })
 
-$missingWindow = 0
+$script:missingHost = 0
 $timer = [System.Windows.Threading.DispatcherTimer]::new()
 $timer.Interval = [TimeSpan]::FromSeconds(2)
 $timer.Add_Tick({
-    $process = Get-Process -Id $codexPid -ErrorAction SilentlyContinue
-    if ($null -ne $process) { $process.Refresh() }
-    if ($null -eq $process -or $process.MainWindowHandle -eq [IntPtr]::Zero) { $missingWindow++ }
-    else { $missingWindow = 0 }
-    if ($missingWindow -ge 3) {
+    $process = Get-Process -Id $HostProcessId -ErrorAction SilentlyContinue
+    if ($null -eq $process) { $script:missingHost++ }
+    else { $script:missingHost = 0 }
+    if ($script:missingHost -ge 3) {
         try { $null = Invoke-Control 'shutdown' } catch {}
         $script:allowClose = $true
         $window.Close()
