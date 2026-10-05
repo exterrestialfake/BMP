@@ -41,7 +41,7 @@ function result<T>(operation: () => Promise<T>) {
 }
 
 function createServer(): McpServer {
-  const server = new McpServer({ name: 'bilibili-audio', version: '0.3.1' });
+  const server = new McpServer({ name: 'bilibili-audio', version: '0.4.0' });
   server.server.onclose = () => { panelSupervisor.stop(); controller.close(); };
   server.registerTool('search', {
     description: '按关键词搜索 B 站视频并替换旧候选。直接向用户展示 display_markdown；用户选择展示编号后，用 candidate_ids 中相同位置的标识和 search_id 调用 play。',

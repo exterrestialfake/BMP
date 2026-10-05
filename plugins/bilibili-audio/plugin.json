@@ -1,13 +1,16 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "bilibili-audio",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "在 Codex 中搜索 B 站视频并在本机播放音频。",
   "keywords": ["bilibili", "audio", "music"],
   "extensions": {
     "com.openai": {
       "interface": {
-        "displayName": "Bilibili Audio",
+        "displayName": "Bilibili as Music Player",
+        "composerIcon": "./assets/icon.png",
+        "logo": "./assets/icon.png",
+        "brandColor": "#00A1D6",
         "shortDescription": "搜索 B 站视频并在本机播放音频。",
         "longDescription": "展示候选视频，选定后用 mpv 在本机播放音频。",
         "category": "Productivity",
