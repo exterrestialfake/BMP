@@ -2,6 +2,20 @@ import type { Candidate } from './video.js';
 
 export type DisplayCandidate = Candidate & { cover_path: string | null };
 
+export interface SearchDisplayResponse {
+  search_id: string;
+  candidate_ids: string[];
+  display_markdown: string;
+}
+
+export function presentSearchResults(searchId: string, candidates: DisplayCandidate[]): SearchDisplayResponse {
+  return {
+    search_id: searchId,
+    candidate_ids: candidates.map((candidate) => candidate.candidate_id),
+    display_markdown: formatCandidateList(candidates)
+  };
+}
+
 function safeText(value: string): string {
   return value.replace(/[\r\n\t]+/g, ' ').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/([\\`*_{}\[\]()#+.!|])/g, '\\$1').trim();
@@ -20,7 +34,7 @@ function duration(value: number | null): string {
 export function formatCandidateList(candidates: DisplayCandidate[]): string {
   if (candidates.length === 0) return '没有找到可选的 B 站视频，请换个检索词。';
   const paragraphs = candidates.map((candidate, index) => {
-    const number = /^\d+$/.test(candidate.candidate_id) ? candidate.candidate_id : String(index + 1);
+    const number = String(index + 1);
     const title = safeText(candidate.title);
     const uploader = safeText(candidate.uploader);
     const published = candidate.published_date ?? '日期未知';

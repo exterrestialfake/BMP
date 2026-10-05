@@ -9,7 +9,7 @@ import { PlaybackController } from './controller.js';
 import { MpvPlayer } from './player.js';
 import { BilibiliSearch } from './search.js';
 import { cacheCover } from './cover.js';
-import { formatCandidateList } from './candidate-list.js';
+import { presentSearchResults } from './candidate-list.js';
 import { PanelSupervisor } from './panel.js';
 import { defaultControlPipe, SharedPlaybackController } from './shared.js';
 
@@ -48,14 +48,14 @@ function createServer(): McpServer {
   const server = new McpServer({ name: 'bilibili-audio', version: '0.3.1' });
   server.server.onclose = () => { panelSupervisor.stop(); controller.close(); };
   server.registerTool('search', {
-    description: '按关键词搜索 B 站视频并替换旧候选。直接向用户展示返回的 display_markdown，其中含标题、UP 主、时长、发布日期、BV 号、链接和本机封面；等待用户选择后再播放。',
+    description: '按关键词搜索 B 站视频并替换旧候选。直接向用户展示 display_markdown；用户选择展示编号后，用 candidate_ids 中相同位置的标识和 search_id 调用 play。',
     inputSchema: z.object({ query: z.string().min(1).max(120), limit: z.number().int().min(1).max(10).default(5) })
   }, async ({ query, limit }) => result(async () => {
     const found = await controller.search(query, limit);
     const candidates = await Promise.all(found.candidates.map(async (candidate) => ({
       ...candidate, cover_path: await cacheCover(candidate.cover_url)
     })));
-    return { ...found, candidates, display_markdown: formatCandidateList(candidates) };
+    return presentSearchResults(found.search_id, candidates);
   })());
   server.registerTool('play', {
     description: '播放用户明确选择的候选，或直接播放明确提供的 BV 号/视频链接。两种输入只能选一种。',

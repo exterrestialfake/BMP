@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { formatCandidateList, type DisplayCandidate } from '../src/candidate-list.js';
+import { formatCandidateList, presentSearchResults, type DisplayCandidate } from '../src/candidate-list.js';
 
 const example: DisplayCandidate = {
   candidate_id: '1', bvid: 'BV1vx411w7Hc', title: '琵琶曲 *现场* <em>版',
@@ -29,4 +29,12 @@ test('缺失日期或图片时保留可选择文字；空列表有明确提示',
   assert.match(output, /封面暂不可用/);
   assert.ok(!output.includes('!['));
   assert.equal(formatCandidateList([]), '没有找到可选的 B 站视频，请换个检索词。');
+});
+
+test('搜索对 Agent 只返回一份展示内容和按展示编号排列的选择标识', () => {
+  const response = presentSearchResults('search-123', [example, { ...example, candidate_id: '42', title: '另一首' }]);
+  assert.deepEqual(Object.keys(response), ['search_id', 'candidate_ids', 'display_markdown']);
+  assert.deepEqual(response.candidate_ids, ['1', '42']);
+  assert.match(response.display_markdown, /\*\*2\. 另一首\*\*/);
+  assert.ok(!response.display_markdown.includes('**42.'));
 });
