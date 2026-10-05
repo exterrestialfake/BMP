@@ -81,19 +81,15 @@ function createServer(): McpServer {
     inputSchema: z.object({ mode: z.enum(['off', 'single', 'sequential']) })
   }, async ({ mode }) => result(() => controller.setMode(mode))());
   server.registerTool('set_paused', {
-    description: '明确暂停或恢复当前播放。',
+    description: '明确暂停或恢复当前播放；停止播放也使用 paused=true，保留进度。空闲或已结束时暂停不报错。',
     inputSchema: z.object({ paused: z.boolean() })
   }, async ({ paused }) => result(() => controller.setPaused(paused))());
   server.registerTool('set_volume', {
     description: '将当前播放器音量设为 0–100。',
     inputSchema: z.object({ volume: z.number().int().min(0).max(100) })
   }, async ({ volume }) => result(() => controller.setVolume(volume))());
-  server.registerTool('stop', {
-    description: '暂停当前音频播放；保留进度，再调用 set_paused(false) 即可继续。',
-    inputSchema: z.object({})
-  }, async () => result(() => controller.stop())());
   server.registerTool('status', {
-    description: '查询当前视频、播放状态、进度、音量、播放模式、历史游标与剩余候选数。',
+    description: '查询完整当前视频信息、播放状态、进度、音量、播放模式、历史位置与长度；不返回完整历史或搜索候选。',
     inputSchema: z.object({})
   }, async () => result(() => controller.status())());
   return server;

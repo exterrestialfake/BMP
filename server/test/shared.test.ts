@@ -19,12 +19,11 @@ class FakePlayer implements PlayerPort {
   async load(url: string) { this.loaded.push(url); this.snapshot.state = 'playing' as const; return this.snapshot; }
   async setPaused(paused: boolean) { this.snapshot.state = paused ? 'paused' : 'playing'; return this.snapshot; }
   async setVolume(volume: number) { this.snapshot.volume = volume; return this.snapshot; }
-  async stop() { this.snapshot.state = 'idle' as const; return this.snapshot; }
   async status() { return this.snapshot; }
   close() {}
 }
 
-test('不同 MCP 实例共享候选、播放状态和停止命令', async () => {
+test('不同 MCP 实例共享候选、播放状态和暂停命令', async () => {
   const pipe = `\\\\.\\pipe\\bilibili-audio-test-${randomUUID()}`;
   const ownerPlayer = new FakePlayer();
   const otherPlayer = new FakePlayer();
@@ -41,7 +40,7 @@ test('不同 MCP 实例共享候选、播放状态和停止命令', async () => 
     await other.playSelection(search.search_id, '2');
     assert.equal((await other.previous()).current?.candidate_id, '1');
     assert.equal((await other.next()).current?.candidate_id, '2');
-    assert.equal((await owner.stop()).state, 'paused');
+    assert.equal((await owner.setPaused(true)).state, 'paused');
     assert.equal((await other.status()).state, 'paused');
   } finally {
     other.close();
@@ -73,7 +72,7 @@ test('独立进程中的新会话可控制主实例', async () => {
     assert.equal((await other.setPaused(true)).state, 'paused');
     await other.playSelection(search.search_id, '2');
     assert.equal((await other.previous()).current?.candidate_id, '1');
-    assert.equal((await other.stop()).state, 'paused');
+    assert.equal((await other.setPaused(true)).state, 'paused');
     assert.deepEqual(localPlayer.loaded, []);
   } finally {
     other.close();

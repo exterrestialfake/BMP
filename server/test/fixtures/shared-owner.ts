@@ -13,7 +13,6 @@ class FakePlayer implements PlayerPort {
   async load(_url: string) { this.snapshot.state = 'playing' as const; return this.snapshot; }
   async setPaused(paused: boolean) { this.snapshot.state = paused ? 'paused' : 'playing'; return this.snapshot; }
   async setVolume(volume: number) { this.snapshot.volume = volume; return this.snapshot; }
-  async stop() { this.snapshot.state = 'idle' as const; return this.snapshot; }
   async status() { return this.snapshot; }
   close() {}
 }

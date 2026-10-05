@@ -18,7 +18,6 @@ export interface PlayerPort {
   setPaused(paused: boolean): Promise<PlaybackSnapshot>;
   setVolume(volume: number): Promise<PlaybackSnapshot>;
   setLoop?(enabled: boolean): Promise<void>;
-  stop(): Promise<PlaybackSnapshot>;
   status(): Promise<PlaybackSnapshot>;
   onEnded?(listener: () => void): void;
   close(): void;
@@ -205,13 +204,6 @@ export class MpvPlayer implements PlayerPort {
 
   async setLoop(enabled: boolean): Promise<void> {
     await this.command(['set_property', 'loop-file', enabled ? 'inf' : 'no']);
-  }
-
-  async stop(): Promise<PlaybackSnapshot> {
-    if (!this.process) return this.status();
-    await this.command(['stop']);
-    this.state = 'idle';
-    return this.status();
   }
 
   async status(): Promise<PlaybackSnapshot> {

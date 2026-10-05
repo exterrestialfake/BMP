@@ -15,6 +15,7 @@ class FakePlayer implements PlayerPort {
   snapshot: PlaybackSnapshot = { state: 'idle', position_seconds: null, duration_seconds: null, volume: 50, recent_error: null };
   ended?: () => void;
   loop = false;
+  pauseRequests: boolean[] = [];
   onEnded(listener: () => void) { this.ended = listener; }
   async setLoop(enabled: boolean) { this.loop = enabled; }
   async load(url: string): Promise<PlaybackSnapshot> {
@@ -23,9 +24,13 @@ class FakePlayer implements PlayerPort {
     this.snapshot.state = 'playing';
     return this.snapshot;
   }
-  async setPaused(paused: boolean) { this.snapshot.state = paused ? 'paused' : 'playing'; return this.snapshot; }
+  async setPaused(paused: boolean) {
+    if (this.snapshot.state !== 'playing' && this.snapshot.state !== 'paused') throw new Error('当前视频未在播放');
+    this.pauseRequests.push(paused);
+    this.snapshot.state = paused ? 'paused' : 'playing';
+    return this.snapshot;
+  }
   async setVolume(volume: number) { this.snapshot.volume = volume; return this.snapshot; }
-  async stop() { this.snapshot.state = 'idle'; return this.snapshot; }
   async status() { return this.snapshot; }
   close() {}
 }
@@ -37,7 +42,10 @@ test('搜索只返回候选；播放历史导航不自动选取搜索候选', as
   assert.equal(player.loaded.length, 0);
   await controller.playSelection(search.search_id, '2');
   assert.deepEqual(player.loaded, [candidates[1].url]);
-  assert.equal((await controller.status()).remaining_candidates, 1);
+  const state = await controller.status();
+  assert.deepEqual(state.current, candidates[1], '当前视频应保留完整候选信息');
+  assert.equal('remaining_candidates' in state, false);
+  assert.equal('history' in state, false, '快照不传输完整历史');
   await assert.rejects(controller.next(), /历史已在末尾/);
   await controller.playSelection(search.search_id, '3');
   await controller.previous();
@@ -47,7 +55,7 @@ test('搜索只返回候选；播放历史导航不自动选取搜索候选', as
   await assert.rejects(controller.next(), /历史已在末尾/);
 });
 
-test('新搜索使旧候选失效；加载失败不追加历史；停止等于暂停', async () => {
+test('新搜索使旧候选失效；加载失败不追加历史；暂停保留历史', async () => {
   const player = new FakePlayer();
   const controller = new PlaybackController({ search: async () => candidates }, player);
   const search = await controller.search('琵琶');
@@ -58,11 +66,80 @@ test('新搜索使旧候选失效；加载失败不追加历史；停止等于�
   assert.equal((await controller.status()).history_length, 1);
   player.failUrl = null;
   const fresh = await controller.search('另一首');
+  assert.deepEqual((await controller.status()).current, candidates[0], '新搜索不改变当前播放');
   await assert.rejects(controller.playSelection(search.search_id, '2'), /候选列表已过期/);
   await controller.playSelection(fresh.search_id, '2');
   await controller.playDirect('BV1vx411w7Hc');
-  assert.equal((await controller.stop()).state, 'paused');
+  assert.equal((await controller.setPaused(true)).state, 'paused');
   assert.equal((await controller.status()).history_length, 3);
+});
+
+test('空闲、结束或失败时暂停不报错；恢复仍要求可播放的视频', async () => {
+  const player = new FakePlayer();
+  const controller = new PlaybackController({ search: async () => candidates }, player);
+  for (const state of ['idle', 'ended', 'error'] as const) {
+    player.snapshot.state = state;
+    assert.equal((await controller.setPaused(true)).state, state);
+    await assert.rejects(controller.setPaused(false), /当前视频未在播放/);
+  }
+  assert.deepEqual(player.pauseRequests, [], '空闲暂停不应向播放器发出无效命令');
+  await controller.playDirect(candidates[0].bvid);
+  assert.equal((await controller.setPaused(true)).state, 'paused');
+  assert.equal((await controller.setPaused(false)).state, 'playing');
+  assert.deepEqual(player.pauseRequests, [true, false]);
+});
+
+test('并发搜索只保留最新候选，较早发起的搜索不能覆盖它', async () => {
+  let completeFirst!: (value: Candidate[]) => void;
+  const controller = new PlaybackController({ search: async (query: string) => query === '旧搜索'
+    ? new Promise<Candidate[]>((resolve) => { completeFirst = resolve; })
+    : [candidates[1]] }, new FakePlayer());
+  const first = controller.search('旧搜索');
+  const rejected = assert.rejects(first, /被更新的搜索取代/);
+  const latest = await controller.search('新搜索');
+  completeFirst([candidates[0]]);
+  await rejected;
+  assert.deepEqual((await controller.playSelection(latest.search_id, '2')).current, candidates[1]);
+  await assert.rejects(controller.playSelection(latest.search_id, '1'), /候选编号不属于/);
+});
+
+test('手动和顺序切歌加载失败时保留历史游标及当前视频', async () => {
+  const player = new FakePlayer();
+  const controller = new PlaybackController({ search: async () => candidates }, player);
+  const search = await controller.search('琵琶');
+  await controller.playSelection(search.search_id, '1');
+  await controller.playSelection(search.search_id, '2');
+  await controller.previous();
+  player.failUrl = candidates[1].url;
+  await assert.rejects(controller.next(), /模拟加载失败/);
+  await controller.setMode('sequential');
+  player.ended?.();
+  await new Promise((resolve) => setImmediate(resolve));
+  const failed = await controller.status();
+  assert.equal(failed.history_position, 1);
+  assert.equal(failed.history_length, 2);
+  assert.deepEqual(failed.current, candidates[0]);
+  player.failUrl = null;
+  await controller.next();
+  player.failUrl = candidates[0].url;
+  await assert.rejects(controller.previous(), /模拟加载失败/);
+  assert.equal((await controller.status()).history_position, 2);
+  assert.deepEqual((await controller.status()).current, candidates[1]);
+});
+
+test('排队中的历史导航完成后忽略旧视频的自然结束事件', async () => {
+  const player = new FakePlayer();
+  const controller = new PlaybackController({ search: async () => candidates }, player);
+  const search = await controller.search('琵琶');
+  await controller.playSelection(search.search_id, '1');
+  await controller.playSelection(search.search_id, '2');
+  await controller.setMode('sequential');
+  const previous = controller.previous();
+  player.ended?.();
+  await previous;
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal((await controller.status()).history_position, 1);
+  assert.deepEqual(player.loaded, [candidates[0].url, candidates[1].url, candidates[0].url]);
 });
 
 test('单曲循环不追加历史', async () => {

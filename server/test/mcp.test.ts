@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 
-test('发布文件能经 Windows stdio 握手并列出九个工具', async () => {
+test('发布文件能经 Windows stdio 握手并列出八个工具', async () => {
   const plugin = process.env.BMP_PLUGIN_ROOT ?? resolve('..', 'plugins', 'bilibili-audio');
   const client = new Client({ name: 'bmp-test', version: '0.1.0' });
   const transport = new StdioClientTransport({
@@ -15,7 +15,7 @@ test('发布文件能经 Windows stdio 握手并列出九个工具', async () =>
   try {
     await client.connect(transport);
     const { tools } = await client.listTools();
-    assert.deepEqual(tools.map((tool) => tool.name).sort(), ['next', 'play', 'previous', 'search', 'set_mode', 'set_paused', 'set_volume', 'status', 'stop']);
+    assert.deepEqual(tools.map((tool) => tool.name).sort(), ['next', 'play', 'previous', 'search', 'set_mode', 'set_paused', 'set_volume', 'status']);
     const status = await client.callTool({ name: 'status', arguments: {} });
     assert.equal(status.isError, undefined);
     assert.equal(status.content[0]?.type, 'text');

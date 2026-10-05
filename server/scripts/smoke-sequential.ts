@@ -44,6 +44,10 @@ try {
   const found = await controller.search('顺序切歌', 2);
   await controller.setMode('single');
   await controller.playSelection(found.search_id, '1');
+  await controller.setVolume(0);
+  await new Promise((done) => setTimeout(done, 2400));
+  assert.equal((await controller.status()).state, 'playing', '短音频经过两轮时仍应单曲循环');
+  assert.equal((await controller.status()).history_length, 1, '单曲循环不应增加历史');
   await controller.playSelection(found.search_id, '2');
   await controller.previous();
   await controller.setMode('sequential');
@@ -56,8 +60,25 @@ try {
   console.log(JSON.stringify({ state: state.state, mode: state.mode, current: state.current?.candidate_id,
     history_position: state.history_position, history_length: state.history_length,
     position_seconds: state.position_seconds, recent_error: state.recent_error }));
-  assert.equal(state.current?.candidate_id, '2', '顺序模式在第一段 EOF 后应切到第二候选');
-  assert.equal(state.history_length, 2, '自动切歌应添加播放历史');
+  assert.equal(state.current?.candidate_id, '2', '顺序模式在第一段 EOF 后应切到历史第二首');
+  assert.equal(state.history_length, 2, '自动切歌不应增加或重排历史');
+  const endDeadline = Date.now() + 4500;
+  while (state.state !== 'ended' && Date.now() < endDeadline) {
+    await new Promise((done) => setTimeout(done, 100));
+    state = await controller.status();
+  }
+  assert.equal(state.state, 'ended', '历史末尾自然结束后应停播');
+  await new Promise((done) => setTimeout(done, 1200));
+  state = await controller.status();
+  assert.equal(state.state, 'ended', '停播后不应回到历史开头');
+  assert.equal(state.history_position, 2);
+  assert.equal(state.history_length, 2);
+  await assert.rejects(controller.next(), /末尾/);
+  assert.equal((await controller.setPaused(true)).state, 'ended', '结束后的停止为安全暂停');
+  await controller.playSelection(found.search_id, '1');
+  assert.equal((await controller.status()).history_length, 2, '重新点播去重，不重复入历史');
+  assert.equal((await controller.previous()).current?.candidate_id, '2', '重新点播第一首后历史应为第二首、第一首');
+  console.log('PASS: 单曲循环、历史顺序 EOF 切歌、末尾停播、安全暂停及重复点播移到末尾');
 } finally {
   player.close();
   if (dirname(temp) === temporaryRoot) await rm(temp, { recursive: true, force: true });
