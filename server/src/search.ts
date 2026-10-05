@@ -2,12 +2,19 @@ import { spawn } from 'node:child_process';
 import { candidateFromYtDlp, type Candidate } from './video.js';
 
 export class BilibiliSearch {
+  private preferVisitor = false;
   constructor(private readonly executable: string) {}
 
   async search(query: string, limit: number): Promise<Candidate[]> {
     const keyword = query.trim();
     if (!keyword || keyword.length > 120) throw new Error('检索词应为 1–120 个字符');
     if (!Number.isInteger(limit) || limit < 1 || limit > 10) throw new Error('结果数应为 1–10');
+
+    // 同一进程已遇到 412 且备用路径可用时，省去反复启动失败搜索的等待。
+    if (this.preferVisitor) {
+      try { return await this.searchWithVisitorCookie(keyword, limit); }
+      catch { this.preferVisitor = false; }
+    }
 
     let output: string;
     try {
@@ -44,7 +51,11 @@ export class BilibiliSearch {
       });
       });
     } catch (error) {
-      if (error instanceof Error && error.message.includes('HTTP 412')) return this.searchWithVisitorCookie(keyword, limit);
+      if (error instanceof Error && error.message.includes('HTTP 412')) {
+        const candidates = await this.searchWithVisitorCookie(keyword, limit);
+        this.preferVisitor = true;
+        return candidates;
+      }
       throw error;
     }
 
@@ -90,7 +101,11 @@ export class BilibiliSearch {
         if (candidate) candidates.push({ ...candidate, candidate_id: String(candidates.length + 1) });
       }
     }
-    if (ids.length > 0 && candidates.length === 0) return this.searchWithVisitorCookie(keyword, limit);
+    if (ids.length > 0 && candidates.length === 0) {
+      const found = await this.searchWithVisitorCookie(keyword, limit);
+      this.preferVisitor = true;
+      return found;
+    }
     return candidates;
   }
 
