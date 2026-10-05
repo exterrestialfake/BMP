@@ -10,3 +10,5 @@ plugins/bilibili-audio/runtime/
 plugins/bilibili-audio/vendor/
 plugins/bilibili-audio/server/index.mjs
 *.log
+.build/
+release/
